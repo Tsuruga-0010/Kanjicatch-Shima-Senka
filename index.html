@@ -8,6 +8,7 @@
         body {
             font-family: Arial, sans-serif;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
@@ -16,15 +17,15 @@
         }
         #game-container {
             position: relative;
-            width: 400px;
-            height: 600px;
+            width: 300px;
+            height: 450px;
             background-color: white;
             overflow: hidden;
         }
         #player {
             position: absolute;
-            width: 40px;
-            height: 40px;
+            width: 30px;
+            height: 30px;
             background-color: blue;
             bottom: 0;
         }
@@ -55,7 +56,7 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            font-size: 18px;
+            font-size: 14px;
             font-weight: bold;
         }
         #end-screen {
@@ -76,11 +77,14 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 10px;
+            width: 300px;
         }
         button {
-            padding: 10px;
-            font-size: 16px;
+            padding: 15px;
+            font-size: 20px;
             cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
         }
     </style>
 </head>
@@ -95,12 +99,12 @@
     </div>
 
     <script>
-        const GAME_WIDTH = 400;
-        const GAME_HEIGHT = 600;
-        const PLAYER_SIZE = 40;
-        const MIN_KANJI_SIZE = 20;
-        const MAX_KANJI_SIZE = 40;
-        const PLAYER_SPEED = 2.5;
+        const GAME_WIDTH = 300;
+        const GAME_HEIGHT = 450;
+        const PLAYER_SIZE = 30;
+        const MIN_KANJI_SIZE = 15;
+        const MAX_KANJI_SIZE = 30;
+        const PLAYER_SPEED = 5;
         const GAME_DURATION = 45;
 
         const kanjiData = [
@@ -121,6 +125,8 @@
         const gameContainer = document.getElementById('game-container');
         const player = document.getElementById('player');
         const scoreTime = document.getElementById('score-time');
+        const leftButton = document.getElementById('left');
+        const rightButton = document.getElementById('right');
 
         function startGame() {
             gameState = 'playing';
@@ -287,12 +293,30 @@
             keysPressed.ArrowRight = false;
         });
 
-        ['left', 'right'].forEach(dir => {
-            const button = document.getElementById(dir);
-            button.addEventListener('mousedown', () => keysPressed[`Arrow${dir.charAt(0).toUpperCase() + dir.slice(1)}`] = true);
-            button.addEventListener('mouseup', () => keysPressed[`Arrow${dir.charAt(0).toUpperCase() + dir.slice(1)}`] = false);
-            button.addEventListener('mouseleave', () => keysPressed[`Arrow${dir.charAt(0).toUpperCase() + dir.slice(1)}`] = false);
-        });
+        function handleTouchStart(direction) {
+            if (gameState === 'playing') {
+                keysPressed[`Arrow${direction}`] = true;
+            }
+        }
+
+        function handleTouchEnd(direction) {
+            if (gameState === 'playing') {
+                keysPressed[`Arrow${direction}`] = false;
+            }
+        }
+
+        leftButton.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouchStart('Left'); });
+        leftButton.addEventListener('touchend', (e) => { e.preventDefault(); handleTouchEnd('Left'); });
+        rightButton.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouchStart('Right'); });
+        rightButton.addEventListener('touchend', (e) => { e.preventDefault(); handleTouchEnd('Right'); });
+
+        // マウスイベントも追加（PCでのクリック操作用）
+        leftButton.addEventListener('mousedown', () => handleTouchStart('Left'));
+        leftButton.addEventListener('mouseup', () => handleTouchEnd('Left'));
+        leftButton.addEventListener('mouseleave', () => handleTouchEnd('Left'));
+        rightButton.addEventListener('mousedown', () => handleTouchStart('Right'));
+        rightButton.addEventListener('mouseup', () => handleTouchEnd('Right'));
+        rightButton.addEventListener('mouseleave', () => handleTouchEnd('Right'));
 
         const startScreen = document.createElement('div');
         startScreen.id = 'end-screen';
