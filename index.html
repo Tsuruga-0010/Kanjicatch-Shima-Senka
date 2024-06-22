@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>落ちてくる漢字キャッチゲーム</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background-color: white;
+            overflow: hidden;
+        }
+        #player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: blue;
+            bottom: 0;
+        }
+        .kanji {
+            position: absolute;
+            font-weight: bold;
+        }
+        .special {
+            color: red;
+        }
+        .popup {
+            position: absolute;
+            font-weight: bold;
+            color: green;
+            animation: fadeOutUp 0.5s ease-out;
+        }
+        @keyframes fadeOutUp {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+        }
+        #score-time {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        #end-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        #controls {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        button {
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="player"></div>
+        <div id="score-time"></div>
+    </div>
+    <div id="controls">
+        <button id="left">←</button>
+        <button id="right">→</button>
+    </div>
+
+    <script>
+        const GAME_WIDTH = 400;
+        const GAME_HEIGHT = 600;
+        const PLAYER_SIZE = 40;
+        const MIN_KANJI_SIZE = 20;
+        const MAX_KANJI_SIZE = 40;
+        const PLAYER_SPEED = 2.5;
+        const GAME_DURATION = 45;
+
+        const kanjiData = [
+            { char: '品', speed: 1, points: 10 },
+            { char: '田', speed: 1.5, points: 25 },
+            { char: '遊', speed: 2, points: 50 },
+        ];
+
+        let gameState = 'idle';
+        let playerPosition = { x: GAME_WIDTH / 2 - PLAYER_SIZE / 2, y: GAME_HEIGHT - PLAYER_SIZE };
+        let kanjis = [];
+        let score = 0;
+        let timeLeft = GAME_DURATION;
+        let caughtKanjis = [];
+        let keysPressed = { ArrowLeft: false, ArrowRight: false };
+        let lastTime = 0;
+
+        const gameContainer = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const scoreTime = document.getElementById('score-time');
+
+        function startGame() {
+            gameState = 'playing';
+            score = 0;
+            timeLeft = GAME_DURATION;
+            kanjis = [];
+            caughtKanjis = [];
+            playerPosition = { x: GAME_WIDTH / 2 - PLAYER_SIZE / 2, y: GAME_HEIGHT - PLAYER_SIZE };
+            updatePlayerPosition();
+            if (document.getElementById('end-screen')) {
+                gameContainer.removeChild(document.getElementById('end-screen'));
+            }
+            document.querySelectorAll('.kanji').forEach(kanji => kanji.remove());
+            lastTime = Date.now();
+            gameLoop();
+        }
+
+        function endGame() {
+            gameState = 'end';
+            const sentence = caughtKanjis.join('');
+            const bonus = calculateBonus(sentence);
+            score += bonus;
+
+            const endScreen = document.createElement('div');
+            endScreen.id = 'end-screen';
+            endScreen.innerHTML = `
+                <h2>ゲーム終了！</h2>
+                <p>最終スコア: ${score}</p>
+                ${bonus > 0 ? `<p style="color: red;">品田遊ボーナス！ ${bonus}点</p>` : ''}
+                <p>あなたの成績は…<br>${renderSentence(sentence)}</p>
+                <button onclick="startGame()">もう一度プレイ</button>
+            `;
+            gameContainer.appendChild(endScreen);
+        }
+
+        function calculateBonus(sentence) {
+            const regex = /品田遊/g;
+            const matches = sentence.match(regex);
+            return matches ? matches.length * 50 : 0;
+        }
+
+        function renderSentence(sentence) {
+            const regex = /(品田遊)/g;
+            return sentence.replace(regex, '<span style="color: red; font-weight: bold;">$1</span>');
+        }
+
+        function movePlayer() {
+            if (keysPressed.ArrowLeft) playerPosition.x = Math.max(0, playerPosition.x - PLAYER_SPEED);
+            if (keysPressed.ArrowRight) playerPosition.x = Math.min(GAME_WIDTH - PLAYER_SIZE, playerPosition.x + PLAYER_SPEED);
+            updatePlayerPosition();
+        }
+
+        function updatePlayerPosition() {
+            player.style.left = `${playerPosition.x}px`;
+            player.style.bottom = '0px';
+        }
+
+        function createKanji() {
+            if (Math.random() < 0.025) {
+                const kanjiTemplate = kanjiData[Math.floor(Math.random() * kanjiData.length)];
+                const kanji = document.createElement('div');
+                kanji.className = 'kanji';
+                if (Math.random() < 0.1) kanji.classList.add('special');
+                kanji.textContent = kanjiTemplate.char;
+                kanji.style.left = `${Math.random() * (GAME_WIDTH - MAX_KANJI_SIZE)}px`;
+                kanji.style.top = '0px';
+                const size = Math.floor(Math.random() * (MAX_KANJI_SIZE - MIN_KANJI_SIZE + 1)) + MIN_KANJI_SIZE;
+                kanji.style.fontSize = `${size}px`;
+                kanji.style.lineHeight = `${size}px`;
+                kanji.dataset.speed = kanjiTemplate.speed;
+                kanji.dataset.points = kanjiTemplate.points;
+                gameContainer.appendChild(kanji);
+                kanjis.push(kanji);
+            }
+        }
+
+        function moveKanjis(deltaTime) {
+            kanjis.forEach((kanji, index) => {
+                const speed = parseFloat(kanji.dataset.speed);
+                kanji.style.top = `${parseFloat(kanji.style.top) + speed}px`;
+                if (parseFloat(kanji.style.top) > GAME_HEIGHT) {
+                    gameContainer.removeChild(kanji);
+                    kanjis.splice(index, 1);
+                }
+            });
+        }
+
+        function checkCollisions() {
+            kanjis.forEach((kanji, index) => {
+                const kanjiRect = kanji.getBoundingClientRect();
+                const playerRect = player.getBoundingClientRect();
+                if (
+                    kanjiRect.left < playerRect.right &&
+                    kanjiRect.right > playerRect.left &&
+                    kanjiRect.top < playerRect.bottom &&
+                    kanjiRect.bottom > playerRect.top
+                ) {
+                    const pointsEarned = kanji.classList.contains('special') ? 
+                        parseInt(kanji.dataset.points) * 2 : parseInt(kanji.dataset.points);
+                    score += pointsEarned;
+                    caughtKanjis.push(kanji.textContent);
+                    createPopup(pointsEarned);
+                    gameContainer.removeChild(kanji);
+                    kanjis.splice(index, 1);
+                }
+            });
+        }
+
+        function createPopup(points) {
+            const popup = document.createElement('div');
+            popup.className = 'popup';
+            popup.textContent = `+${points}`;
+            popup.style.left = `${playerPosition.x}px`;
+            popup.style.bottom = `${PLAYER_SIZE}px`;
+            gameContainer.appendChild(popup);
+            setTimeout(() => gameContainer.removeChild(popup), 500);
+        }
+
+        function updateScoreTime() {
+            scoreTime.textContent = `スコア: ${score} | 残り時間: ${Math.ceil(timeLeft)}秒`;
+        }
+
+        function gameLoop() {
+            if (gameState !== 'playing') return;
+
+            const currentTime = Date.now();
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            movePlayer();
+            createKanji();
+            moveKanjis(deltaTime);
+            checkCollisions();
+            updateScoreTime();
+
+            timeLeft -= deltaTime;
+            if (timeLeft <= 0) {
+                endGame();
+                return;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function handleKeyDown(e) {
+            if (gameState === 'playing' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                e.preventDefault();
+                keysPressed[e.key] = true;
+            }
+        }
+
+        function handleKeyUp(e) {
+            if (gameState === 'playing' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                e.preventDefault();
+                keysPressed[e.key] = false;
+            }
+        }
+
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+
+        window.addEventListener('blur', () => {
+            keysPressed.ArrowLeft = false;
+            keysPressed.ArrowRight = false;
+        });
+
+        ['left', 'right'].forEach(dir => {
+            const button = document.getElementById(dir);
+            button.addEventListener('mousedown', () => keysPressed[`Arrow${dir.charAt(0).toUpperCase() + dir.slice(1)}`] = true);
+            button.addEventListener('mouseup', () => keysPressed[`Arrow${dir.charAt(0).toUpperCase() + dir.slice(1)}`] = false);
+            button.addEventListener('mouseleave', () => keysPressed[`Arrow${dir.charAt(0).toUpperCase() + dir.slice(1)}`] = false);
+        });
+
+        const startScreen = document.createElement('div');
+        startScreen.id = 'end-screen';
+        startScreen.innerHTML = '<button onclick="startGame()">スタート</button>';
+        gameContainer.appendChild(startScreen);
+    </script>
+</body>
+</html>
